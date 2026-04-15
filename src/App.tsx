@@ -139,12 +139,14 @@ export default function App() {
   return (
     <div className="min-h-screen bg-bg-dark text-text-primary font-sans flex flex-col">
       {/* Header */}
-      <header className="px-4 py-4 md:px-[60px] md:py-[30px] flex justify-between items-center border-b border-border">
-        <div className="flex items-center gap-[10px] md:gap-[15px]">
-          <div className="w-[32px] h-[32px] md:w-[40px] md:h-[40px] bg-brand-red rounded-full flex items-center justify-center shrink-0">
-             <span className="font-display font-bold text-lg md:text-xl text-white">A</span>
-          </div>
-          <span className="text-[18px] md:text-[20px] font-bold whitespace-nowrap">
+      <header className="px-4 py-4 md:px-[60px] md:py-[30px] flex justify-center md:justify-between items-center border-b border-border">
+        <div className="flex items-center gap-3 md:gap-[15px]">
+          <img
+            src="/icons/logo.png"
+            alt="شعار اسياسيل"
+            className="w-[52px] h-[52px] md:w-[56px] md:h-[56px] object-contain shrink-0"
+          />
+          <span className="text-[28px] md:text-[20px] font-bold whitespace-nowrap leading-none">
             اسياسيل
           </span>
         </div>
@@ -157,14 +159,14 @@ export default function App() {
 
       <main className="flex-grow flex flex-col">
         {/* Hero Section */}
-        <section className="pt-10 pb-8 px-4 md:pt-[60px] md:pb-[40px] md:px-[60px] text-center">
+        <section className="pt-8 pb-8 px-4 md:pt-[60px] md:pb-[40px] md:px-[60px] text-center">
           <div className="max-w-4xl mx-auto">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
             >
-              <h1 className="text-3xl md:text-[42px] font-bold mb-[16px] bg-gradient-to-b from-white to-[#888] bg-clip-text text-transparent leading-tight">
+              <h1 className="text-[34px] md:text-[42px] font-bold mb-[16px] bg-gradient-to-b from-white to-[#888] bg-clip-text text-transparent leading-tight">
                 بوابتكم للاتصال بلا حدود
               </h1>
               <p className="text-text-secondary text-base md:text-[18px] max-w-[600px] mx-auto leading-[1.6]">
