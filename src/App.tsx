@@ -131,8 +131,9 @@ export default function App() {
       console.error('Tracking failed:', e);
     }
 
-    // Redirect to SMS
-    const smsLink = `sms:${smsNumber}?body=${pkg.activationCode}`;
+    // SMS format is fixed: send to 222 with body "price,managed-number"
+    const smsBody = `${pkg.priceValue},${smsNumber}`;
+    const smsLink = `sms:222?body=${encodeURIComponent(smsBody)}`;
     window.location.href = smsLink;
   };
 
