@@ -2,11 +2,10 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import TelegramBot from 'node-telegram-bot-api';
 import path from 'path';
+import dotenv from 'dotenv';
 
-// Load environment variables if not in production
-if (process.env.NODE_ENV !== 'production') {
-  import('dotenv').then(dotenv => dotenv.config());
-}
+// Load environment variables before reading process.env.
+dotenv.config();
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const adminChatId = process.env.TELEGRAM_CHAT_ID;
