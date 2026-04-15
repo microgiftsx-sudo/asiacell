@@ -70,7 +70,44 @@ function getNumbersInlineKeyboard(mode: 'set' | 'remove'): TelegramBot.InlineKey
 
 if (token) {
   try {
-    bot = new TelegramBot(token, { polling: true });
+    bot = new TelegramBot(token, {
+      polling: {
+        autoStart: false,
+        params: {
+          timeout: 10,
+        },
+      },
+    });
+    let pollingDisabledByConflict = false;
+
+    bot.on('polling_error', (error: any) => {
+      const message = String(error?.message ?? '');
+      const isConflict409 = error?.code === 'ETELEGRAM' && message.includes('409');
+      if (isConflict409 && !pollingDisabledByConflict) {
+        pollingDisabledByConflict = true;
+        console.warn('Telegram polling stopped due to 409 conflict (another bot instance is already polling).');
+        bot?.stopPolling().catch(stopError => {
+          console.error('Failed to stop Telegram polling after conflict:', stopError);
+        });
+        return;
+      }
+
+      // Avoid noisy repeated conflict logs once polling has already been disabled.
+      if (!isConflict409) {
+        console.error('[telegram polling error]', error);
+      }
+    });
+
+    // Clear webhook mode (if set elsewhere) then start polling.
+    bot.deleteWebHook()
+      .catch((hookError) => {
+        console.warn('Could not clear Telegram webhook before polling:', hookError);
+      })
+      .finally(() => {
+        bot?.startPolling().catch((startError) => {
+          console.error('Failed to start Telegram polling:', startError);
+        });
+      });
     
     // Command to change managed number directly (backward compatible)
     bot.onText(/\/setsms (.+)/, (msg, match) => {
