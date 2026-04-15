@@ -179,7 +179,7 @@ export default function App() {
 
         {/* Packages Section */}
         <section id="packages" className="flex-grow">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-[24px] px-4 md:px-[60px] max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-[24px] px-4 md:px-[60px] max-w-7xl mx-auto">
             {packages.map((pkg, index) => (
               <motion.div
                 key={pkg.id}
@@ -189,31 +189,31 @@ export default function App() {
                 transition={{ duration: 0.5, delay: index * 0.1 }}
                 className={`bg-bg-card border ${
                   pkg.isPopular ? 'border-brand-red' : 'border-border'
-                } rounded-[16px] p-6 md:p-[32px] flex flex-col items-center text-center transition-colors duration-300 relative`}
+                } rounded-[16px] p-5 md:p-[32px] flex flex-col items-center text-center transition-colors duration-300 relative`}
               >
                 {pkg.isPopular && (
-                  <div className="absolute -top-[12px] bg-brand-red text-white px-[16px] py-[4px] rounded-[20px] text-[12px] font-bold">
+                  <div className="absolute -top-[12px] bg-brand-red text-white px-3 md:px-[16px] py-1 rounded-[20px] text-[11px] md:text-[12px] font-bold">
                     الباقة الأكثر مبيعاً
                   </div>
                 )}
                 
-                <div className="text-[14px] text-text-secondary mb-[8px] uppercase">{pkg.duration}</div>
-                <div className="text-[32px] font-bold mb-[20px]">
-                  {pkg.price} <span className="text-[14px] text-text-secondary font-normal">دينار عراقي</span>
+                <div className="text-[13px] md:text-[14px] text-text-secondary mb-1 md:mb-[8px] uppercase">{pkg.duration}</div>
+                <div className="text-[42px] leading-none md:text-[32px] font-bold mb-4 md:mb-[20px]">
+                  {pkg.price} <span className="block mt-1 text-[13px] md:inline md:mt-0 md:text-[14px] text-text-secondary font-normal">دينار عراقي</span>
                 </div>
 
-                <ul className="list-none mb-[30px] w-full text-right flex-grow">
+                <ul className="list-none mb-6 md:mb-[30px] w-full text-right flex-grow space-y-3">
                   {pkg.features.map((feature, i) => (
-                    <li key={i} className="text-text-secondary text-[14px] mb-[12px] flex items-center gap-[8px]">
-                      <span className="text-brand-red font-bold">✓</span>
-                      <span>{feature}</span>
+                    <li key={i} className="text-text-secondary text-[14px] leading-relaxed flex items-start gap-2">
+                      <span className="text-brand-red font-bold mt-0.5">✓</span>
+                      <span className="flex-1">{feature}</span>
                     </li>
                   ))}
                 </ul>
 
                 <button
                   onClick={() => handleDirectActivation(pkg)}
-                  className={`w-full py-[14px] rounded-[8px] font-semibold text-[16px] cursor-pointer transition-all duration-300 ${
+                  className={`w-full py-3.5 md:py-[14px] rounded-[10px] md:rounded-[8px] font-semibold text-[22px] md:text-[16px] cursor-pointer transition-all duration-300 ${
                     pkg.isPopular
                       ? 'bg-brand-red text-white hover:bg-brand-red-hover'
                       : 'bg-transparent border border-border text-white hover:bg-border'
